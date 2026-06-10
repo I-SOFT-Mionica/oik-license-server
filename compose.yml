@@ -1,0 +1,27 @@
+services:
+  license-server:
+    build: .
+    image: oik-license-server:latest
+    ports:
+      - "127.0.0.1:8000:8000"   # bind to loopback — Caddy/nginx terminates TLS
+    volumes:
+      - license-data:/data
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      DB_PATH: /data/licenses.db
+      GITHUB_REPO: I-SOFT-Mionica/biracki-odbor
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  license-data:
