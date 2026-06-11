@@ -3,7 +3,7 @@ services:
     build: .
     image: oik-license-server:latest
     ports:
-      - "127.0.0.1:8000:8000"   # bind to loopback — Caddy/nginx terminates TLS
+      - "127.0.0.1:8001:8000"   # bind to loopback — Caddy/nginx terminates TLS
     volumes:
       - license-data:/data
     environment:
