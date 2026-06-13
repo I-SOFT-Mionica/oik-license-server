@@ -1,13 +1,17 @@
 import hashlib
 import json
+import logging
 import secrets
 import shutil
+import subprocess
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Header, HTTPException, UploadFile
 from pydantic import BaseModel
+
+log = logging.getLogger(__name__)
 
 import app.config as config
 from app.database import get_conn
@@ -116,3 +120,31 @@ def upload_release(
 
     return {"ok": True, "tag": tag, "sha256": sha256,
             "url": f"/downloads/{tag}/OIK_Setup.exe"}
+
+
+@router.post("/deploy")
+def deploy(background_tasks: BackgroundTasks, _: None = Depends(_require_admin)):
+    """Pull latest code and restart the container stack.
+
+    Called by the GitHub Actions deploy workflow via curl — avoids the need
+    for SSH keys entirely. Returns immediately; restart happens in background.
+    """
+    background_tasks.add_task(_run_deploy)
+    return {"ok": True, "message": "deploy started"}
+
+
+def _run_deploy() -> None:
+    import app.config as _cfg  # local import to avoid circular at module load
+    app_dir = Path(__file__).resolve().parent.parent.parent
+    try:
+        subprocess.run(
+            ["git", "pull", "origin", "main"],
+            cwd=app_dir, check=True, capture_output=True, text=True,
+        )
+        subprocess.run(
+            ["podman", "compose", "up", "-d", "--build"],
+            cwd=app_dir, check=True, capture_output=True, text=True,
+        )
+        log.info("deploy: completed OK")
+    except subprocess.CalledProcessError as exc:
+        log.error("deploy failed: %s\n%s", exc, exc.stderr)
