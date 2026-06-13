@@ -25,7 +25,7 @@ jobs:
           envs: JWT_SECRET,ADMIN_TOKEN,GITHUB_TOKEN_RELEASES,SERVER_BASE_URL
           script: |
             set -e
-            cd ${{ secrets.SERVER_APP_PATH }}
+            cd /home/deploy/oik-license-server
             git pull origin main
 
             # Rewrite .env from GitHub Secrets on every deploy.
