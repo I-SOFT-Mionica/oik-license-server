@@ -1,9 +1,12 @@
+import hashlib
 import json
 import secrets
+import shutil
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
 from pydantic import BaseModel
 
 import app.config as config
@@ -75,3 +78,41 @@ def clear_hid(license_id: str, _: None = Depends(_require_admin)):
     with get_conn() as conn:
         conn.execute("UPDATE licenses SET hid=NULL WHERE id=?", (license_id,))
     return {"ok": True}
+
+
+@router.post("/releases/{tag}/upload")
+def upload_release(
+    tag: str,
+    file: UploadFile = File(...),
+    _: None = Depends(_require_admin),
+) -> dict:
+    """Store a signed installer binary for a release tag.
+
+    Called automatically by the biracki-odbor release.yml workflow after
+    building OIK_Setup.exe. Also usable manually for backfilling older tags.
+
+    The file lands at {releases_dir}/{tag}/OIK_Setup.exe.
+    latest_release.json is updated to point check-update at the new version.
+    """
+    releases_path = Path(config.releases_dir())
+    dest_dir = releases_path / tag
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / "OIK_Setup.exe"
+
+    with dest.open("wb") as out:
+        shutil.copyfileobj(file.file, out)
+
+    sha256 = hashlib.sha256(dest.read_bytes()).hexdigest()
+    meta = {
+        "tag": tag,
+        "sha256": sha256,
+        "size_bytes": dest.stat().st_size,
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+        "download_url": f"{config.server_base_url()}/downloads/{tag}/OIK_Setup.exe",
+    }
+    (releases_path / "latest_release.json").write_text(
+        json.dumps(meta, indent=2), encoding="utf-8"
+    )
+
+    return {"ok": True, "tag": tag, "sha256": sha256,
+            "url": f"/downloads/{tag}/OIK_Setup.exe"}

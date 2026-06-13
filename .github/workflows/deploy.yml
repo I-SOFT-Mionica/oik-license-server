@@ -1,0 +1,53 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Deploy
+run-name: "Deploy to api.isoft.rs"
+
+# Triggers on every push to main AND supports manual re-deploy.
+# Secrets (JWT_SECRET, ADMIN_TOKEN, etc.) are written to .env on the server
+# from GitHub Secrets — the server's .env is never edited manually.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # Pass secrets as env vars into the remote shell — never interpolate
+          # them directly into the script string (would expose them in logs).
+          envs: JWT_SECRET,ADMIN_TOKEN,GITHUB_TOKEN_RELEASES,SERVER_BASE_URL
+          script: |
+            set -e
+            cd ${{ secrets.SERVER_APP_PATH }}
+            git pull origin main
+
+            # Rewrite .env from GitHub Secrets on every deploy.
+            # GitHub Secrets is the single authoritative source — rotating
+            # a secret means updating it in GitHub, not SSHing to the server.
+            printf 'JWT_SECRET=%s\nADMIN_TOKEN=%s\nGITHUB_TOKEN=%s\nSERVER_BASE_URL=%s\n' \
+              "$JWT_SECRET" \
+              "$ADMIN_TOKEN" \
+              "$GITHUB_TOKEN_RELEASES" \
+              "$SERVER_BASE_URL" \
+              > .env
+
+            podman compose up -d --build
+
+            echo ""
+            echo "=== Health check ==="
+            sleep 3
+            curl -sf https://api.isoft.rs/healthz \
+              && echo "OK" \
+              || { echo "HEALTH CHECK FAILED"; exit 1; }
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          GITHUB_TOKEN_RELEASES: ${{ secrets.GITHUB_TOKEN_RELEASES }}
+          SERVER_BASE_URL: ${{ secrets.SERVER_BASE_URL }}

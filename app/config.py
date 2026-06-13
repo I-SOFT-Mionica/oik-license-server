@@ -22,3 +22,13 @@ def github_token() -> str | None:
 
 def admin_token() -> str | None:
     return os.environ.get("ADMIN_TOKEN", "").strip() or None
+
+
+def releases_dir() -> str:
+    """Directory where uploaded installer binaries are stored in the data volume."""
+    return os.environ.get("RELEASES_DIR", "/data/releases")
+
+
+def server_base_url() -> str:
+    """Public base URL of this server — used to build download URLs in check-update."""
+    return os.environ.get("SERVER_BASE_URL", "https://api.isoft.rs").rstrip("/")

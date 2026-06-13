@@ -1,5 +1,7 @@
+import json
 import logging
 from datetime import date
+from pathlib import Path
 
 import httpx
 import jwt
@@ -52,6 +54,18 @@ def check_update(req: UpdateCheckRequest):
             expired_on=updates_until,
         )
 
+    # Prefer locally hosted installer — faster, our bandwidth, no GitHub dependency.
+    # Falls back to GitHub Releases API if nothing has been uploaded yet (e.g. during
+    # initial setup before the first release workflow run completes).
+    local = _read_local_release_meta()
+    if local:
+        return UpdateCheckResponse(
+            ok=True,
+            latest_version=local["tag"],
+            download_url=local["download_url"],
+            release_notes="",
+        )
+
     try:
         release = _get_latest_release()
     except Exception as exc:
@@ -69,6 +83,17 @@ def check_update(req: UpdateCheckRequest):
         download_url=download_url,
         release_notes=str(release.get("body") or ""),
     )
+
+
+def _read_local_release_meta() -> dict | None:
+    """Return latest_release.json content, or None if no upload has happened yet."""
+    p = Path(config.releases_dir()) / "latest_release.json"
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return None
 
 
 def _get_latest_release() -> dict:
