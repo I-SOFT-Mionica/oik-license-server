@@ -8,6 +8,7 @@ services:
       - license-data:/data
     environment:
       JWT_SECRET: ${JWT_SECRET}
+      ADMIN_TOKEN: ${ADMIN_TOKEN}
       DB_PATH: /data/licenses.db
       GITHUB_REPO: I-SOFT-Mionica/biracki-odbor
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}

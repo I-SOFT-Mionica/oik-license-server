@@ -18,3 +18,7 @@ def github_repo() -> str:
 
 def github_token() -> str | None:
     return os.environ.get("GITHUB_TOKEN") or None
+
+
+def admin_token() -> str | None:
+    return os.environ.get("ADMIN_TOKEN") or None

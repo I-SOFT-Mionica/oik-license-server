@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OIK – Лиценце</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;color:#1e293b;min-height:100vh}
+
+/* Auth */
+#auth{position:fixed;inset:0;background:#f1f5f9;display:flex;align-items:center;justify-content:center;z-index:100}
+#auth.hidden{display:none}
+.auth-card{background:white;border-radius:12px;padding:2rem;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(0,0,0,.1)}
+.auth-card h1{font-size:1.4rem;margin-bottom:.25rem}
+.auth-card .sub{color:#64748b;font-size:.875rem;margin-bottom:1.5rem}
+
+/* Layout */
+header{background:white;border-bottom:1px solid #e2e8f0;padding:.875rem 2rem;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:1.05rem;font-weight:600}
+main{max-width:1140px;margin:2rem auto;padding:0 1.5rem;display:flex;flex-direction:column;gap:1.5rem}
+
+/* Card */
+.card{background:white;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);padding:1.5rem}
+.card h2{font-size:.95rem;font-weight:600;color:#334155;margin-bottom:1.25rem}
+
+/* Form */
+.form-row{display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:.3rem}
+.field label{font-size:.78rem;font-weight:500;color:#475569;text-transform:uppercase;letter-spacing:.03em}
+input[type=text],input[type=date],input[type=password]{
+  border:1px solid #cbd5e1;border-radius:6px;padding:.5rem .75rem;
+  font-size:.9rem;outline:none;transition:border-color .15s;background:white}
+input:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+
+/* Buttons */
+button{border:none;border-radius:6px;padding:.5rem 1rem;font-size:.85rem;font-weight:500;cursor:pointer;transition:filter .15s;white-space:nowrap}
+button:hover{filter:brightness(.92)}
+.btn-primary{background:#2563eb;color:white}
+.btn-ghost{background:#f1f5f9;color:#475569}
+.btn-sm{padding:.3rem .65rem;font-size:.78rem}
+.btn-danger{background:#dc2626;color:white}
+.btn-success{background:#16a34a;color:white}
+.btn-warning{background:#d97706;color:white}
+
+/* Table */
+table{width:100%;border-collapse:collapse;font-size:.875rem}
+th{text-align:left;font-size:.72rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.04em;padding:.5rem .75rem;border-bottom:2px solid #e2e8f0}
+td{padding:.65rem .75rem;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#f8fafc}
+
+/* Badge */
+.badge{display:inline-block;border-radius:9999px;padding:.2rem .65rem;font-size:.72rem;font-weight:600}
+.badge-green{background:#dcfce7;color:#15803d}
+.badge-red{background:#fee2e2;color:#b91c1c}
+
+/* Code */
+.code{font-family:'Courier New',monospace;letter-spacing:.07em;font-weight:600}
+.hid{font-family:monospace;font-size:.78rem;color:#64748b}
+.muted{color:#94a3b8}
+
+/* Result */
+.result{margin-top:1rem;padding:1rem 1.25rem;border-radius:8px;background:#f0fdf4;border:1px solid #bbf7d0}
+.result .code{font-size:1.35rem;color:#15803d}
+.result p{font-size:.82rem;color:#166534;margin-top:.3rem}
+
+/* Actions */
+.actions{display:flex;gap:.4rem}
+
+/* Empty */
+.empty{text-align:center;color:#94a3b8;padding:2.5rem;font-size:.875rem}
+
+/* Toast */
+#toast{position:fixed;bottom:1.5rem;right:1.5rem;background:#1e293b;color:white;
+  padding:.7rem 1.2rem;border-radius:8px;font-size:.85rem;
+  opacity:0;transition:opacity .2s;pointer-events:none;z-index:200}
+#toast.show{opacity:1}
+
+/* Error */
+.err{color:#dc2626;font-size:.8rem;margin-top:.5rem}
+</style>
+</head>
+<body>
+
+<div id="auth">
+  <div class="auth-card">
+    <h1>OIK Лиценце</h1>
+    <p class="sub">Унесите admin токен.</p>
+    <div class="field" style="margin-bottom:.75rem">
+      <label>Admin токен</label>
+      <input id="tok" type="password" placeholder="●●●●●●●●" autofocus>
+    </div>
+    <button class="btn-primary" style="width:100%" onclick="login()">Пријави се</button>
+    <p class="err" id="auth-err"></p>
+  </div>
+</div>
+
+<header>
+  <h1>OIK — Управљање лиценцама</h1>
+  <button class="btn-ghost" onclick="logout()">Одјава</button>
+</header>
+
+<main>
+  <div class="card">
+    <h2>Издај нову лиценцу</h2>
+    <div class="form-row">
+      <div class="field">
+        <label>Општина / клијент</label>
+        <input id="f-to" type="text" placeholder="Општина Уб" style="width:240px">
+      </div>
+      <div class="field">
+        <label>Ажурирања до</label>
+        <input id="f-until" type="date">
+      </div>
+      <button class="btn-primary" onclick="issue()">Издај</button>
+    </div>
+    <div id="issue-result" class="result" style="display:none">
+      <div class="code" id="res-code"></div>
+      <p id="res-detail"></p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Све лиценце</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Шифра</th>
+          <th>Клијент</th>
+          <th>Ажурирања до</th>
+          <th>Машина</th>
+          <th>Статус</th>
+          <th>Издата</th>
+          <th>Акције</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="7" class="empty">Учитавање…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+let TOKEN = sessionStorage.getItem('oik_admin_tok') || '';
+
+// Default date: today + 1 year
+const d = new Date(); d.setFullYear(d.getFullYear() + 1);
+document.getElementById('f-until').value = d.toISOString().slice(0,10);
+
+function hdrs() {
+  return {'Content-Type':'application/json','Authorization':'Bearer '+TOKEN};
+}
+
+async function req(method, path, body) {
+  const r = await fetch(path, {method, headers: hdrs(), body: body ? JSON.stringify(body) : undefined});
+  if (r.status === 401) { logout(); return null; }
+  return r;
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Auth
+async function login() {
+  TOKEN = document.getElementById('tok').value.trim();
+  const r = await fetch('/admin/licenses', {headers: hdrs()});
+  if (r.status === 401) {
+    document.getElementById('auth-err').textContent = 'Погрешан токен.';
+    return;
+  }
+  sessionStorage.setItem('oik_admin_tok', TOKEN);
+  document.getElementById('auth').classList.add('hidden');
+  render(await r.json());
+}
+
+function logout() {
+  TOKEN = ''; sessionStorage.removeItem('oik_admin_tok');
+  document.getElementById('auth').classList.remove('hidden');
+  document.getElementById('tok').value = '';
+  document.getElementById('auth-err').textContent = '';
+}
+
+document.getElementById('tok').addEventListener('keydown', e => { if (e.key==='Enter') login(); });
+
+// Load
+async function load() {
+  const r = await req('GET', '/admin/licenses');
+  if (r) render(await r.json());
+}
+
+function render(lics) {
+  const tbody = document.getElementById('tbody');
+  if (!lics.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">Нема издатих лиценци.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = lics.map(l => {
+    const hid = l.hid
+      ? `<span class="hid">${l.hid.slice(0,8)}…</span>`
+      : '<span class="muted">—</span>';
+    const badge = l.revoked
+      ? '<span class="badge badge-red">Опозвана</span>'
+      : '<span class="badge badge-green">Активна</span>';
+    const toggle = l.revoked
+      ? `<button class="btn-sm btn-success" onclick="unrevoke('${l.id}')">Врати</button>`
+      : `<button class="btn-sm btn-danger"  onclick="revoke('${l.id}')">Опозови</button>`;
+    const clearBtn = l.hid
+      ? `<button class="btn-sm btn-warning" onclick="clearHid('${l.id}')">Ресет машине</button>`
+      : '';
+    return `<tr>
+      <td><span class="code">${esc(l.license_code)}</span></td>
+      <td>${esc(l.issued_to)}</td>
+      <td>${esc(l.updates_until)}</td>
+      <td>${hid}</td>
+      <td>${badge}</td>
+      <td>${esc(l.created_at.slice(0,10))}</td>
+      <td><div class="actions">${toggle}${clearBtn}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+// Actions
+async function issue() {
+  const issued_to    = document.getElementById('f-to').value.trim();
+  const updates_until = document.getElementById('f-until').value;
+  if (!issued_to || !updates_until) { toast('Попуните сва поља.'); return; }
+  const r = await req('POST', '/admin/licenses', {issued_to, updates_until});
+  if (!r) return;
+  const data = await r.json();
+  document.getElementById('res-code').textContent = data.license_code;
+  document.getElementById('res-detail').textContent =
+    `${issued_to} · ажурирања до ${updates_until} · предајте шифру оператеру`;
+  document.getElementById('issue-result').style.display = 'block';
+  document.getElementById('f-to').value = '';
+  load();
+}
+
+async function revoke(id) {
+  if (!confirm('Опозвати ову лиценцу?')) return;
+  await req('POST', `/admin/licenses/${id}/revoke`);
+  toast('Лиценца опозвана.'); load();
+}
+
+async function unrevoke(id) {
+  await req('POST', `/admin/licenses/${id}/unrevoke`);
+  toast('Лиценца враћена.'); load();
+}
+
+async function clearHid(id) {
+  if (!confirm('Ресетовати везу са машином?\nОператер ће моћи да активира лиценцу на другом рачунару.')) return;
+  await req('POST', `/admin/licenses/${id}/clear-hid`);
+  toast('Веза са машином ресетована.'); load();
+}
+
+// Init
+if (TOKEN) { document.getElementById('auth').classList.add('hidden'); load(); }
+</script>
+</body>
+</html>
