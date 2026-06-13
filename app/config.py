@@ -21,4 +21,4 @@ def github_token() -> str | None:
 
 
 def admin_token() -> str | None:
-    return os.environ.get("ADMIN_TOKEN") or None
+    return os.environ.get("ADMIN_TOKEN", "").strip() or None
