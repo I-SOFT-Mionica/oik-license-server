@@ -1,5 +1,7 @@
 import json
 import logging
+import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -13,6 +15,9 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
 app = FastAPI(title="OIK License Server", docs_url=None, redoc_url=None)
+
+_STARTED_AT: str = ""
+_GIT_SHA: str = ""
 
 app.include_router(activate.router, prefix="/api/v1/biracki")
 app.include_router(check_update.router, prefix="/api/v1/biracki")
@@ -72,11 +77,20 @@ def _read_latest_release_meta() -> dict | None:
 
 @app.on_event("startup")
 def startup() -> None:
+    global _STARTED_AT, _GIT_SHA
+    _STARTED_AT = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    try:
+        _GIT_SHA = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], text=True
+        ).strip()
+    except Exception:
+        _GIT_SHA = "unknown"
     init_db()
+    log.info("Started at %s  git=%s", _STARTED_AT, _GIT_SHA)
     log.info("Database ready at %s", config.db_path())
     log.info("Releases dir: %s", config.releases_dir())
 
 
 @app.get("/healthz", include_in_schema=False)
 def healthz() -> dict:
-    return {"status": "ok"}
+    return {"status": "ok", "started_at": _STARTED_AT, "git": _GIT_SHA}
