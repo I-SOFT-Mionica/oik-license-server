@@ -3,12 +3,11 @@ import json
 import logging
 import secrets
 import shutil
-import subprocess
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Header, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
 from pydantic import BaseModel
 
 log = logging.getLogger(__name__)
@@ -25,6 +24,22 @@ def _require_admin(authorization: str = Header(...)) -> None:
         raise HTTPException(503, {"error": "ADMIN_TOKEN not configured on server"})
     if authorization != f"Bearer {tok}":
         raise HTTPException(401, {"error": "unauthorized"})
+
+
+def _prune_old_releases(releases_path: Path, keep: int = 2) -> None:
+    """Delete all but the `keep` most recently uploaded release directories.
+
+    Sorted by upload time (mtime), so the newest `keep` releases are always
+    retained and older ones are removed to cap disk usage.
+    """
+    dirs = sorted(
+        [d for d in releases_path.iterdir() if d.is_dir()],
+        key=lambda d: d.stat().st_mtime,
+        reverse=True,
+    )
+    for old in dirs[keep:]:
+        log.info("pruning old release: %s", old.name)
+        shutil.rmtree(old)
 
 
 class IssueRequest(BaseModel):
@@ -118,33 +133,7 @@ def upload_release(
         json.dumps(meta, indent=2), encoding="utf-8"
     )
 
+    _prune_old_releases(releases_path)
+
     return {"ok": True, "tag": tag, "sha256": sha256,
             "url": f"/downloads/{tag}/OIK_Setup.exe"}
-
-
-@router.post("/deploy")
-def deploy(background_tasks: BackgroundTasks, _: None = Depends(_require_admin)):
-    """Pull latest code and restart the container stack.
-
-    Called by the GitHub Actions deploy workflow via curl — avoids the need
-    for SSH keys entirely. Returns immediately; restart happens in background.
-    """
-    background_tasks.add_task(_run_deploy)
-    return {"ok": True, "message": "deploy started"}
-
-
-def _run_deploy() -> None:
-    import app.config as _cfg  # local import to avoid circular at module load
-    app_dir = Path(__file__).resolve().parent.parent.parent
-    try:
-        subprocess.run(
-            ["git", "pull", "origin", "main"],
-            cwd=app_dir, check=True, capture_output=True, text=True,
-        )
-        subprocess.run(
-            ["podman", "compose", "up", "-d", "--build"],
-            cwd=app_dir, check=True, capture_output=True, text=True,
-        )
-        log.info("deploy: completed OK")
-    except subprocess.CalledProcessError as exc:
-        log.error("deploy failed: %s\n%s", exc, exc.stderr)
