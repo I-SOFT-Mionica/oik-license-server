@@ -63,6 +63,23 @@ def latest_release_json() -> dict:
     return meta
 
 
+# ── In-app "what's new" changelog ────────────────────────────────────────────
+# Public — no auth. Lets biracki-odbor's About page show/correct release
+# notes without a client build (see POST /admin/changelog in routes/admin.py).
+# Always 200 + {"entries": [...]} — an empty list before the first admin
+# POST, never 404 (the client merges this over its own built-in list).
+
+@app.get("/downloads/changelog.json", include_in_schema=False)
+def changelog_json() -> dict:
+    p = Path(config.changelog_path())
+    if not p.exists():
+        return {"entries": []}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {"entries": []}
+
+
 def _read_latest_release_meta() -> dict | None:
     p = Path(config.releases_dir()) / "latest_release.json"
     if not p.exists():

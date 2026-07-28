@@ -56,6 +56,7 @@ Named podman volume `license-data` mounted at `/data/`:
 - `/data/licenses.db` — SQLite database
 - `/data/releases/` — uploaded installers
 - `/data/releases/latest_release.json` — metadata for check-update
+- `/data/changelog.json` — in-app "what's new" changelog entries (see below)
 
 ## Common operations
 
@@ -87,6 +88,27 @@ podman logs oik-license-server_license-server_1 2>&1 | tail -40
 
 If stale container state: delete the container (not the volume) and rerun
 `podman compose up -d`. The `license-data` volume persists the database.
+
+## In-app changelog ("what's new")
+
+`GET /downloads/changelog.json` — public, no auth, always `200 {"entries": [...]}`
+(empty list before the first admin POST, never 404). biracki-odbor's About
+page fetches this in the background on every launch and merges it over its
+own built-in `_CHANGELOG` list — this entry wins on a version collision, so
+copy can be corrected/expanded post-release without a client build.
+
+`POST /admin/changelog` — same Bearer auth as the other `/admin/*` routes.
+```bash
+curl -X POST https://api.isoft.rs/admin/changelog \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"version": "0.74.0", "date": "1.8.2026.", "bullets": ["Прва ставка", "Друга ставка"]}'
+```
+`version` is bare semver (leading `v` stripped automatically), `date` is a
+pre-formatted Serbian display string (`"D.M.YYYY."`, returned verbatim — no
+reformatting), `bullets` is 1–4 non-empty strings. Returns `201` + the stored
+entry, `409` if that version is already present (no update/delete endpoint
+yet — dedup only), `422` on a malformed body.
 
 ## Client contract (do not change without updating biracki-odbor)
 

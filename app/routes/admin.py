@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+import re
 import secrets
 import shutil
 import uuid
@@ -137,3 +138,51 @@ def upload_release(
 
     return {"ok": True, "tag": tag, "sha256": sha256,
             "url": f"/downloads/{tag}/OIK_Setup.exe"}
+
+
+_SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
+
+
+class ChangelogEntry(BaseModel):
+    version: str
+    date: str
+    bullets: list[str]
+
+
+@router.post("/changelog", status_code=201)
+def post_changelog(entry: ChangelogEntry, _: None = Depends(_require_admin)) -> dict:
+    """Add one entry to the "what's new" changelog served by
+    GET /downloads/changelog.json.
+
+    Lets biracki-odbor's About page show corrected/expanded release notes
+    without shipping a new client build — the client merges this over its
+    own built-in list, this entry wins on a version collision.
+    """
+    version = entry.version.strip().lstrip("v")
+    date = entry.date.strip()
+    bullets = [b.strip() for b in entry.bullets if b and b.strip()]
+
+    if not _SEMVER.match(version):
+        raise HTTPException(422, {"error": "invalid_version", "detail": entry.version})
+    if not date:
+        raise HTTPException(422, {"error": "invalid_date"})
+    if not (1 <= len(bullets) <= 4):
+        raise HTTPException(422, {"error": "invalid_bullets"})
+
+    path = Path(config.changelog_path())
+    data: dict = {"entries": []}
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            data = {"entries": []}
+
+    if any(e["version"] == version for e in data.get("entries", [])):
+        raise HTTPException(409, {"error": "version_exists", "version": version})
+
+    item = {"version": version, "date": date, "bullets": bullets}
+    data.setdefault("entries", []).insert(0, item)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    return item
