@@ -1,6 +1,6 @@
 import json
 import logging
-import subprocess
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -96,12 +96,7 @@ def _read_latest_release_meta() -> dict | None:
 def startup() -> None:
     global _STARTED_AT, _GIT_SHA
     _STARTED_AT = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-    try:
-        _GIT_SHA = subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"], text=True
-        ).strip()
-    except Exception:
-        _GIT_SHA = "unknown"
+    _GIT_SHA = os.environ.get("GIT_SHA", "unknown")[:7]
     init_db()
     log.info("Started at %s  git=%s", _STARTED_AT, _GIT_SHA)
     log.info("Database ready at %s", config.db_path())

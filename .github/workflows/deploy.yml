@@ -31,6 +31,8 @@ jobs:
           file: ./Containerfile
           push: true
           tags: ghcr.io/i-soft-mionica/oik-license-server:latest
+          build-args: |
+            GIT_SHA=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
