@@ -24,6 +24,19 @@ def admin_token() -> str | None:
     return os.environ.get("ADMIN_TOKEN", "").strip() or None
 
 
+def changelog_token() -> str | None:
+    """Separate, narrowly-scoped credential for POST /admin/changelog.
+
+    Deliberately NOT the same secret as ADMIN_TOKEN: that token also
+    gates issuing/revoking real licenses and uploading the installer
+    executable users download. Changelog content is public marketing
+    text (the GET side has no auth at all) — a leaked or delegated
+    CHANGELOG_TOKEN can only ever post/correct "what's new" copy,
+    never touch licensing or the shipped binary.
+    """
+    return os.environ.get("CHANGELOG_TOKEN", "").strip() or None
+
+
 def releases_dir() -> str:
     """Directory where uploaded installer binaries are stored in the data volume."""
     return os.environ.get("RELEASES_DIR", "/data/releases")

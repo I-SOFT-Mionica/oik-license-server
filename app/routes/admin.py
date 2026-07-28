@@ -27,6 +27,15 @@ def _require_admin(authorization: str = Header(...)) -> None:
         raise HTTPException(401, {"error": "unauthorized"})
 
 
+def _require_changelog_token(authorization: str = Header(...)) -> None:
+    """Separate from _require_admin on purpose — see config.changelog_token()."""
+    tok = config.changelog_token()
+    if not tok:
+        raise HTTPException(503, {"error": "CHANGELOG_TOKEN not configured on server"})
+    if authorization != f"Bearer {tok}":
+        raise HTTPException(401, {"error": "unauthorized"})
+
+
 def _prune_old_releases(releases_path: Path, keep: int = 2) -> None:
     """Delete all but the `keep` most recently uploaded release directories.
 
@@ -150,13 +159,19 @@ class ChangelogEntry(BaseModel):
 
 
 @router.post("/changelog", status_code=201)
-def post_changelog(entry: ChangelogEntry, _: None = Depends(_require_admin)) -> dict:
+def post_changelog(entry: ChangelogEntry, _: None = Depends(_require_changelog_token)) -> dict:
     """Add one entry to the "what's new" changelog served by
     GET /downloads/changelog.json.
 
     Lets biracki-odbor's About page show corrected/expanded release notes
     without shipping a new client build — the client merges this over its
     own built-in list, this entry wins on a version collision.
+
+    Auth: CHANGELOG_TOKEN, NOT ADMIN_TOKEN — this is deliberately a
+    separate, narrower credential (see config.changelog_token()) since
+    changelog content is public marketing text, not licensing data or
+    the shipped executable. Safe to delegate/automate without handing
+    out the ability to issue/revoke licenses.
     """
     version = entry.version.strip().lstrip("v")
     date = entry.date.strip()

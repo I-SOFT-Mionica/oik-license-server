@@ -15,7 +15,7 @@ app/
   routes/
     activate.py      — POST /api/v1/biracki/activate
     check_update.py  — POST /api/v1/biracki/check-update
-    admin.py         — /admin/* (all protected by ADMIN_TOKEN)
+    admin.py         — /admin/* (ADMIN_TOKEN, except /admin/changelog: CHANGELOG_TOKEN)
   static/
     admin.html       — single-file admin web UI
 ```
@@ -45,7 +45,12 @@ The deploy workflow writes `.env` from GitHub Secrets on every deploy.
 **Do not edit `.env` manually** — change the GitHub Secret and redeploy.
 
 GitHub Secrets in this repo:
-- `ADMIN_TOKEN` — admin UI + all `/admin/*` routes + deploy webhook
+- `ADMIN_TOKEN` — admin UI + all `/admin/*` routes except `/admin/changelog` + deploy webhook
+- `CHANGELOG_TOKEN` — POST /admin/changelog ONLY. Deliberately separate from
+  ADMIN_TOKEN: changelog content is public marketing text, not licensing data
+  or the shipped executable, so this can be handed to a release-automation
+  pipeline (e.g. biracki-odbor's own release process) without also granting
+  it the ability to issue/revoke licenses.
 - `JWT_SECRET` — signs license JWTs (min 32 chars, required)
 - `SERVER_BASE_URL` — `https://api.isoft.rs`
 - `GITHUB_TOKEN` — optional GitHub PAT for check-update fallback
@@ -97,10 +102,11 @@ page fetches this in the background on every launch and merges it over its
 own built-in `_CHANGELOG` list — this entry wins on a version collision, so
 copy can be corrected/expanded post-release without a client build.
 
-`POST /admin/changelog` — same Bearer auth as the other `/admin/*` routes.
+`POST /admin/changelog` — `CHANGELOG_TOKEN`, NOT `ADMIN_TOKEN` (deliberately
+separate — see the secrets list above).
 ```bash
 curl -X POST https://api.isoft.rs/admin/changelog \
-  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Authorization: Bearer <CHANGELOG_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{"version": "0.74.0", "date": "1.8.2026.", "bullets": ["Прва ставка", "Друга ставка"]}'
 ```
