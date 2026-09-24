@@ -117,36 +117,57 @@ def upload_release(
 ) -> dict:
     """Store a signed installer binary for a release tag.
 
-    Called automatically by the biracki-odbor release.yml workflow after
-    building OIK_Setup.exe. Also usable manually for backfilling older tags.
+    Called automatically by the biracki-odbor release workflow after
+    building the installers. Also usable manually for backfilling.
 
-    The file lands at {releases_dir}/{tag}/OIK_Setup.exe.
-    latest_release.json is updated to point check-update at the new version.
+    The file lands at {releases_dir}/{tag}/{filename}, where the filename
+    comes from the upload and must be one of config.INSTALLER_FILENAMES. One tag
+    holds several products — OIK and its Formalizator companion are built
+    from the same tag and published side by side.
+
+    This used to hardcode the destination as OIK_Setup.exe and ignore the
+    uploaded name entirely, which made a second upload for the same tag
+    silently overwrite the OIK installer — and then rewrite
+    latest_release.json with the *new* file's sha256 while still
+    advertising it as OIK_Setup.exe. Every client that auto-updates would
+    have downloaded the wrong installer and found the hash matched it.
+
+    latest_release.json describes what OIK's own updater should fetch, so
+    only an OIK_Setup.exe upload touches it.
     """
+    filename = Path(file.filename or "").name
+    if filename not in config.INSTALLER_FILENAMES:
+        raise HTTPException(400, {
+            "error": "unsupported_filename",
+            "filename": filename,
+            "allowed": sorted(config.INSTALLER_FILENAMES),
+        })
+
     releases_path = Path(config.releases_dir())
     dest_dir = releases_path / tag
     dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / "OIK_Setup.exe"
+    dest = dest_dir / filename
 
     with dest.open("wb") as out:
         shutil.copyfileobj(file.file, out)
 
     sha256 = hashlib.sha256(dest.read_bytes()).hexdigest()
-    meta = {
-        "tag": tag,
-        "sha256": sha256,
-        "size_bytes": dest.stat().st_size,
-        "uploaded_at": datetime.now(timezone.utc).isoformat(),
-        "download_url": f"{config.server_base_url()}/downloads/{tag}/OIK_Setup.exe",
-    }
-    (releases_path / "latest_release.json").write_text(
-        json.dumps(meta, indent=2), encoding="utf-8"
-    )
+    if filename == config.OIK_INSTALLER:
+        meta = {
+            "tag": tag,
+            "sha256": sha256,
+            "size_bytes": dest.stat().st_size,
+            "uploaded_at": datetime.now(timezone.utc).isoformat(),
+            "download_url": f"{config.server_base_url()}/downloads/{tag}/{config.OIK_INSTALLER}",
+        }
+        (releases_path / "latest_release.json").write_text(
+            json.dumps(meta, indent=2), encoding="utf-8"
+        )
 
     _prune_old_releases(releases_path)
 
-    return {"ok": True, "tag": tag, "sha256": sha256,
-            "url": f"/downloads/{tag}/OIK_Setup.exe"}
+    return {"ok": True, "tag": tag, "filename": filename, "sha256": sha256,
+            "url": f"/downloads/{tag}/{filename}"}
 
 
 _SEMVER = re.compile(r"^\d+\.\d+\.\d+$")

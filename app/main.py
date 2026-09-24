@@ -35,24 +35,47 @@ def admin_ui() -> FileResponse:
 # Serve binaries uploaded via POST /admin/releases/{tag}/upload.
 # Public — no auth. Clients receive the URL from check-update.
 
-@app.get("/downloads/{tag}/OIK_Setup.exe", include_in_schema=False)
-def download_versioned(tag: str) -> FileResponse:
-    path = Path(config.releases_dir()) / tag / "OIK_Setup.exe"
-    if not path.exists():
-        raise HTTPException(404, {"error": "not_found", "tag": tag})
-    return FileResponse(
-        path,
-        filename="OIK_Setup.exe",
-        media_type="application/octet-stream",
-    )
+# NOTE ON ORDER: the /latest/ route MUST stay above the /{tag}/ one.
+# FastAPI matches in declaration order, and "latest" is a perfectly good
+# value for the {tag} parameter — so with the versioned route first, every
+# request for the stable link was served by it, went looking for a release
+# directory literally named "latest", and 404'd. That is exactly what
+# happened: the stable link existed but had never worked, and was written
+# up downstream as "no version-independent path exists".
 
+@app.get("/downloads/latest/{filename}", include_in_schema=False)
+def download_latest(filename: str) -> FileResponse:
+    """Version-independent link — always the currently published release.
 
-@app.get("/downloads/latest/OIK_Setup.exe", include_in_schema=False)
-def download_latest() -> FileResponse:
+    This is what support hands to someone who needs to reinstall, so it
+    must not change from one release to the next.
+    """
     meta = _read_latest_release_meta()
     if meta is None:
         raise HTTPException(404, {"error": "no_release_uploaded_yet"})
-    return download_versioned(meta["tag"])
+    return download_versioned(meta["tag"], filename)
+
+
+@app.get("/downloads/{tag}/{filename}", include_in_schema=False)
+def download_versioned(tag: str, filename: str) -> FileResponse:
+    """One tag holds several installers — OIK and its Formalizator
+    companion are built from the same tag and published side by side.
+
+    `filename` is caller-supplied and names a file that the receiving
+    machine will execute, so it is checked against a whitelist rather
+    than sanitised: anything not on the list is simply not a thing this
+    server serves.
+    """
+    if filename not in config.INSTALLER_FILENAMES:
+        raise HTTPException(404, {"error": "not_found", "filename": filename})
+    path = Path(config.releases_dir()) / tag / filename
+    if not path.exists():
+        raise HTTPException(404, {"error": "not_found", "tag": tag, "filename": filename})
+    return FileResponse(
+        path,
+        filename=filename,
+        media_type="application/octet-stream",
+    )
 
 
 @app.get("/downloads/latest.json", include_in_schema=False)

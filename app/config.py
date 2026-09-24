@@ -37,6 +37,21 @@ def changelog_token() -> str | None:
     return os.environ.get("CHANGELOG_TOKEN", "").strip() or None
 
 
+# Installers this server will accept and serve, by exact filename.
+#
+# A whitelist rather than an open path: both the upload destination and the
+# download route take a caller-supplied segment, and the files involved are
+# executables handed to municipal machines that run them. Anything not named
+# here is rejected outright, which also disposes of path traversal without
+# relying on separate sanitising.
+#
+# One release tag holds several products — OIK and its Formalizator companion
+# are built from the same tag in biracki-odbor and published side by side.
+OIK_INSTALLER = "OIK_Setup.exe"
+FORMALIZATOR_INSTALLER = "Formalizator_Setup.exe"
+INSTALLER_FILENAMES = frozenset({OIK_INSTALLER, FORMALIZATOR_INSTALLER})
+
+
 def releases_dir() -> str:
     """Directory where uploaded installer binaries are stored in the data volume."""
     return os.environ.get("RELEASES_DIR", "/data/releases")
