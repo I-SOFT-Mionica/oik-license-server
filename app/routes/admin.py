@@ -62,7 +62,7 @@ class IssueRequest(BaseModel):
 def list_licenses(_: None = Depends(_require_admin)):
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT id, license_code, issued_to, updates_until, modules, hid, revoked, created_at"
+            "SELECT id, license_code, issued_to, updates_until, modules, hid, revoked, created_at, ed25519_issued_at"
             " FROM licenses ORDER BY created_at DESC"
         ).fetchall()
     result = []

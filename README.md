@@ -242,7 +242,8 @@ The named volume is unchanged — no data loss.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `JWT_SECRET` | yes | — | HS256 signing secret, min 32 chars |
+| `JWT_SECRET` | yes | — | HS256 secret: verifies legacy tokens (signs only if `JWT_SIGNING_KEY` is unset), min 32 chars |
+| `JWT_SIGNING_KEY` | no | — | Ed25519 private key, base64 of the raw 32-byte seed; signs new licence tokens |
 | `DB_PATH` | no | `/data/licenses.db` | SQLite file path |
 | `GITHUB_REPO` | no | `I-SOFT-Mionica/biracki-odbor` | Repo to query for latest release |
 | `GITHUB_TOKEN` | no | — | GitHub PAT for higher API rate limit |

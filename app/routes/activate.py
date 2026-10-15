@@ -2,7 +2,8 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from app.database import get_conn
-from app.jwt_utils import sign_token
+from app.jwt_utils import sign_token, signing_enabled
+from datetime import datetime, timezone
 from app.schemas import ActivateRequest, ActivateResponse
 
 router = APIRouter()
@@ -34,4 +35,11 @@ def activate(req: ActivateRequest):
                 (req.hid, lic["id"]),
             )
 
-    return ActivateResponse(token=sign_token(lic, req.hid))
+    token = sign_token(lic, req.hid)
+    if signing_enabled():
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE licenses SET ed25519_issued_at = ? WHERE id = ?",
+                (datetime.now(timezone.utc).isoformat(), lic["id"]),
+            )
+    return ActivateResponse(token=token)

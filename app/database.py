@@ -25,6 +25,11 @@ def init_db() -> None:
     conn = sqlite3.connect(db)
     try:
         conn.executescript(_DDL)
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(licenses)")}
+        if "ed25519_issued_at" not in cols:
+            # When this licence last received an Ed25519-signed token. Lets
+            # the admin see when every install has left HS256 behind.
+            conn.execute("ALTER TABLE licenses ADD COLUMN ed25519_issued_at TEXT")
         conn.commit()
     finally:
         conn.close()

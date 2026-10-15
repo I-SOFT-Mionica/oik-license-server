@@ -51,7 +51,8 @@ GitHub Secrets in this repo:
   or the shipped executable, so this can be handed to a release-automation
   pipeline (e.g. biracki-odbor's own release process) without also granting
   it the ability to issue/revoke licenses.
-- `JWT_SECRET` — signs license JWTs (min 32 chars, required)
+- `JWT_SECRET` — verifies legacy HS256 licence tokens (and signs them if JWT_SIGNING_KEY is unset) (min 32 chars, required)
+- `JWT_SIGNING_KEY` — Ed25519 private key (base64 of the raw 32-byte seed). Signs new licence tokens; OIK verifies them offline with the embedded public key. `/check-update` re-issues Ed25519 tokens to installs still on HS256 and stamps `licenses.ed25519_issued_at`.
 - `SERVER_BASE_URL` — `https://api.isoft.rs`
 - `GITHUB_TOKEN` — optional GitHub PAT for check-update fallback
 

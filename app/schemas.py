@@ -22,3 +22,6 @@ class UpdateCheckResponse(BaseModel):
     release_notes: str = ""
     reason: str = ""
     expired_on: str = ""
+    # A freshly signed Ed25519 token for an install still holding an HS256
+    # one; the desktop app replaces license.dat with it. Empty otherwise.
+    token: str = ""

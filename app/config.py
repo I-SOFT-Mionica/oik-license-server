@@ -8,6 +8,13 @@ def jwt_secret() -> str:
     return val
 
 
+def jwt_signing_key() -> str:
+    """Ed25519 private key for licence tokens: base64 of the raw 32-byte
+    seed (one line, so it fits an env file). Empty => tokens stay HS256.
+    The matching public key is embedded in the desktop app."""
+    return os.environ.get("JWT_SIGNING_KEY", "").strip()
+
+
 def db_path() -> str:
     return os.environ.get("DB_PATH", "/data/licenses.db")
 

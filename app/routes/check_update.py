@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 import app.config as config
 from app.database import get_conn
-from app.jwt_utils import verify_token
+from app.jwt_utils import ALG, sign_token, signing_enabled, token_alg, verify_token
 from app.schemas import UpdateCheckRequest, UpdateCheckResponse
 
 log = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ def check_update(req: UpdateCheckRequest):
 
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT revoked, hid FROM licenses WHERE id = ?", (license_id,)
+            "SELECT * FROM licenses WHERE id = ?", (license_id,)
         ).fetchone()
 
     if row is None:
@@ -42,6 +42,8 @@ def check_update(req: UpdateCheckRequest):
     if row["hid"] != hid_in_token:
         return JSONResponse(status_code=403, content={"error": "machine_mismatch"})
 
+    refreshed = _refreshed_token(req.token, dict(row), hid_in_token)
+
     try:
         cutoff = date.fromisoformat(updates_until)
     except ValueError:
@@ -49,6 +51,7 @@ def check_update(req: UpdateCheckRequest):
 
     if date.today() > cutoff:
         return UpdateCheckResponse(
+            token=refreshed,
             ok=False,
             reason="updates_expired",
             expired_on=updates_until,
@@ -60,6 +63,7 @@ def check_update(req: UpdateCheckRequest):
     local = _read_local_release_meta()
     if local:
         return UpdateCheckResponse(
+            token=refreshed,
             ok=True,
             latest_version=local["tag"],
             download_url=local["download_url"],
@@ -70,7 +74,7 @@ def check_update(req: UpdateCheckRequest):
         release = _get_latest_release()
     except Exception as exc:
         log.warning("GitHub release fetch failed: %s", exc)
-        return UpdateCheckResponse(ok=True)
+        return UpdateCheckResponse(ok=True, token=refreshed)
 
     tag = release.get("tag_name", "")
     download_url = (
@@ -78,6 +82,7 @@ def check_update(req: UpdateCheckRequest):
         if tag else ""
     )
     return UpdateCheckResponse(
+        token=refreshed,
         ok=True,
         latest_version=tag,
         download_url=download_url,
@@ -109,3 +114,18 @@ def _get_latest_release() -> dict:
     )
     resp.raise_for_status()
     return resp.json()
+
+
+def _refreshed_token(raw: str, license_row: dict, hid: str) -> str:
+    """A new Ed25519 token for an install still holding an HS256 one
+    (verified, not revoked, same machine -- checked by the caller).
+    Empty when signing isn't configured or the token is already Ed25519."""
+    if not signing_enabled() or token_alg(raw) == ALG:
+        return ""
+    token = sign_token(license_row, hid)
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE licenses SET ed25519_issued_at = ? WHERE id = ?",
+            (datetime.now(timezone.utc).isoformat(), license_row["id"]),
+        )
+    return token

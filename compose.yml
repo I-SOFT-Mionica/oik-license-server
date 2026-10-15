@@ -8,6 +8,7 @@ services:
       - license-data:/data
     environment:
       JWT_SECRET: ${JWT_SECRET}
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-}
       ADMIN_TOKEN: ${ADMIN_TOKEN}
       DB_PATH: /data/licenses.db
       RELEASES_DIR: /data/releases
