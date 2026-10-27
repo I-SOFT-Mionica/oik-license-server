@@ -204,3 +204,25 @@ def test_pruning_still_caps_the_number_of_tags(api_client, releases_dir, admin_h
     kept = sorted(d.name for d in releases_dir.iterdir() if d.is_dir())
 
     assert kept == ["v1.1.0", "v1.2.0"]
+
+
+# ── Signed release manifest (verified by the desktop updater) ─────────
+
+
+def test_release_manifest_is_stored_and_served_next_to_the_installer(
+    api_client, releases_dir, admin_headers,
+):
+    """The app fetches /downloads/{tag}/release-manifest.json as a sibling
+    of the installer URL; the server just stores and serves it."""
+    body = b'{"tag": "v1.0.0", "files": {}, "signature": "x"}'
+    r = _upload(api_client, admin_headers, "v1.0.0", "release-manifest.json", body)
+    assert r.status_code == 200 and r.json()["ok"] is True
+    got = api_client.get("/downloads/v1.0.0/release-manifest.json")
+    assert got.status_code == 200 and got.content == body
+
+
+def test_manifest_upload_does_not_touch_latest_json(api_client, releases_dir, admin_headers):
+    _upload(api_client, admin_headers, "v1.0.0", OIK, b"OIK BINARY")
+    before = (releases_dir / "latest_release.json").read_text(encoding="utf-8")
+    _upload(api_client, admin_headers, "v1.0.0", "release-manifest.json", b"{}")
+    assert (releases_dir / "latest_release.json").read_text(encoding="utf-8") == before

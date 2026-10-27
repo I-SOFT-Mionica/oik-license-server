@@ -56,7 +56,11 @@ def changelog_token() -> str | None:
 # are built from the same tag in biracki-odbor and published side by side.
 OIK_INSTALLER = "OIK_Setup.exe"
 FORMALIZATOR_INSTALLER = "Formalizator_Setup.exe"
-INSTALLER_FILENAMES = frozenset({OIK_INSTALLER, FORMALIZATOR_INSTALLER})
+# Signed by the release build (key only in GitHub CI); the desktop app
+# refuses any installer that doesn't match it. Stored and served like an
+# installer, but never touches latest_release.json.
+RELEASE_MANIFEST = "release-manifest.json"
+INSTALLER_FILENAMES = frozenset({OIK_INSTALLER, FORMALIZATOR_INSTALLER, RELEASE_MANIFEST})
 
 
 def releases_dir() -> str:
